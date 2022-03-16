@@ -168,14 +168,6 @@ func tokenizeNull(source []rune, start int) (jsonToken, int, error) {
 	var stage = Initial
 	var cursor = start
 
-	var stageTransfer = func(expected rune, next State) {
-		if r == expected {
-			stage = next
-			return
-		}
-		stage = Panic
-	}
-
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
 
@@ -184,10 +176,10 @@ func tokenizeNull(source []rune, start int) (jsonToken, int, error) {
 		}
 
 		switch stage {
-		case Initial:	stageTransfer('n', N)
-		case N: 		stageTransfer('u', Nu)
-		case Nu: 		stageTransfer('l', Nul)
-		case Nul:		stageTransfer('l', Legal)
+		case Initial:	if r == 'n' { stage = N } else { stage = Panic }
+		case N: 		if r == 'u' { stage = Nu } else { stage = Panic }
+		case Nu: 		if r == 'l' { stage = Nul } else { stage = Panic }
+		case Nul:		if r == 'l' { stage = Legal } else { stage = Panic }
 		case Legal: 	stage = Panic
 		case Panic: 	stage = Panic
 		}
