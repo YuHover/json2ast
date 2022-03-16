@@ -118,14 +118,6 @@ func tokenizeBoolean(source []rune, start int) (jsonToken, int, error) {
 	var stage = Initial
 	var cursor = start
 
-	var stageTransfer = func(expected rune, next State) {
-		if r == expected {
-			stage = next
-			return
-		}
-		stage = Panic
-	}
-
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
 		if delimiters[r] {
@@ -133,15 +125,16 @@ func tokenizeBoolean(source []rune, start int) (jsonToken, int, error) {
 		}
 
 		switch stage {
-		case Initial:	stageTransfer('t', T)
-						if stage == Panic { stageTransfer('f', F) }
-		case T:			stageTransfer('r', Tr)
-		case Tr:		stageTransfer('u', Tru)
-		case Tru:		stageTransfer('e', Legal)
-		case F:			stageTransfer('a', Fa)
-		case Fa:		stageTransfer('l', Fal)
-		case Fal:		stageTransfer('s', Fals)
-		case Fals:		stageTransfer('e', Legal)
+		case Initial:	if r == 't' { stage = T; continue }
+						if r == 'f' { stage = F; continue }
+						stage = Panic
+		case T:			if r == 'r' { stage = Tr } else { stage = Panic }
+		case Tr:		if r == 'u' { stage = Tru } else { stage = Panic }
+		case Tru:		if r == 'e' { stage = Legal } else { stage = Panic }
+		case F:			if r == 'a' { stage = Fa } else { stage = Panic }
+		case Fa:		if r == 'l' { stage = Fal } else { stage = Panic }
+		case Fal:		if r == 's' { stage = Fals } else { stage = Panic }
+		case Fals:		if r == 'e' { stage = Legal } else { stage = Panic }
 		case Legal:		stage = Panic
 		case Panic:		stage = Panic
 		}
