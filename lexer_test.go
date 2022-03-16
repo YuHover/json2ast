@@ -127,9 +127,26 @@ func TestTokenizeNumber(t *testing.T) {
 		"1.",
 		"01",
 		"1.e1",
+		"-",
+		"+",
+		"-,",
+		"+123",
+		"-1234.",
+		"1.2e-",
+		"1.33e+",
+		".3",
+		".34e-2",
 	}
 
-	t.Log(validTests, invalidTests)
+	for _, js := range validTests {
+		token, cursor, err := tokenizeNumber([]rune(js), 0)
+		t.Log(js, token, err, cursor)
+	}
+
+	for _, js := range invalidTests {
+		token, cursor, err := tokenizeNumber([]rune(js), 0)
+		t.Log(js, token, err, cursor)
+	}
 }
 
 func TestTokenizeString(t *testing.T) {

@@ -214,11 +214,14 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 	)
 
 	var r rune
-	var cursor = start
 	var stage = Initial
-	loop:
+	var cursor = start
+
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
+		if delimiters[r] {
+			break
+		}
 		switch stage {
 		case Initial:
 			if r == '0' { stage = Zero; continue }
@@ -228,7 +231,6 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 		case Zero:
 			if r == '.' { stage = Dot; continue }
 			if r == 'e' || r == 'E' { stage = E; continue }
-			if delimiters[r] { break loop }
 			stage = Panic
 		case Neg:
 			if r == '0' { stage = Zero; continue }
@@ -238,7 +240,6 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 			if unicode.IsDigit(r) { stage = Integer; continue }
 			if r == '.' { stage = Dot; continue }
 			if r == 'e' || r == 'E' { stage = E; continue }
-			if delimiters[r] { break loop }
 			stage = Panic
 		case Dot:
 			if unicode.IsDigit(r) { stage = Frac; continue }
@@ -246,7 +247,6 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 		case Frac:
 			if unicode.IsDigit(r) { stage = Frac; continue }
 			if r == 'e' || r == 'E' { stage = E; continue }
-			if delimiters[r] { break loop }
 			stage = Panic
 		case E:
 			if r == '-' || r == '+' { stage = ESign; continue }
@@ -257,9 +257,8 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 			stage = Panic
 		case Exp:
 			if unicode.IsDigit(r) { stage = Exp; continue }
-			if delimiters[r] { break loop }
 			stage = Panic
-		case Panic: if delimiters[r] { break loop }
+		case Panic: stage = Panic
 		}
 	}
 
