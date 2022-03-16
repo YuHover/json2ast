@@ -291,41 +291,31 @@ func tokenizeString(source []rune, start int) (jsonToken, int, error) {
 	var stage = Initial
 	var cursor = start
 
-	loop:
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
+
+		if r == '"' && (stage != Initial && stage != Escape) {
+			if stage == Open {
+				stage = Close
+			}
+			break
+		}
+
 		switch stage {
-		case Initial: if r == '"' { stage = Open } else { stage = Panic }
+		case Initial: 	if r == '"' { stage = Open } else { stage = Panic }
+		case Unicode: 	if isHex(r) { stage = Hex } else { stage = Panic }
+		case Hex: 		if isHex(r) { stage = HexHex } else { stage = Panic }
+		case HexHex: 	if isHex(r) { stage = HexHexHex } else { stage = Panic }
+		case HexHexHex: if isHex(r) { stage = Open; continue } else { stage = Panic }
 		case Open:
-			if r == '"' { stage = Close; break loop }
 			if r == '\\' { stage = Escape; continue }
 			if r >= 0x0020 && r <= 0x10FFF && !unicode.IsControl(r) { stage = Open; continue }
 			stage = Panic
 		case Escape:
-			if r == '\\' || r == 'b' || r == 'f' || r == 'n' || r == 'r' || r == 't' || r == '"' {
-				stage = Open
-				continue
-			}
 			if r == 'u' { stage = Unicode; continue }
-			stage = Panic
-		case Unicode:
-			if unicode.IsDigit(r) || r >= 'A' && r <= 'F' || r >= 'a' && r <= 'f' { stage = Hex; continue }
-			if r == '"' { break loop }
-			stage = Panic
-		case Hex:
-			if unicode.IsDigit(r) || r >= 'A' && r <= 'F' || r >= 'a' && r <= 'f' { stage = HexHex; continue }
-			if r == '"' { break loop }
-			stage = Panic
-		case HexHex:
-			if unicode.IsDigit(r) || r >= 'A' && r <= 'F' || r >= 'a' && r <= 'f' { stage = HexHexHex; continue }
-			if r == '"' { break loop }
-			stage = Panic
-		case HexHexHex:
-			if unicode.IsDigit(r) || r >= 'A' && r <= 'F' || r >= 'a' && r <= 'f' { stage = Open; continue }
-			if r == '"' { break loop }
+			if isEscapable(r) { stage = Open; continue }
 			stage = Panic
 		case Panic:
-			if r == '"' { break loop }
 			if r == '\\' { cursor++ } // skip next rune
 			stage = Panic
 		}
@@ -346,4 +336,12 @@ func tokenizeString(source []rune, start int) (jsonToken, int, error) {
 	}
 
 	return token, cursor, err
+}
+
+func isHex(r rune) bool {
+	return unicode.IsDigit(r) || r >= 'A' && r <= 'F' || r >= 'a' && r <= 'f'
+}
+
+func isEscapable(r rune) bool {
+	return r == '\\' || r == 'b' || r == 'f' || r == 'n' || r == 'r' || r == 't' || r == '"' || r == 'u'
 }

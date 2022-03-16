@@ -150,5 +150,37 @@ func TestTokenizeNumber(t *testing.T) {
 }
 
 func TestTokenizeString(t *testing.T) {
+    validTests := []string {
+        `""`,
+        `"abc"`,
+        `"\\\b\f\r\n\t\"\u0030\"\t\n\r\f\b\\"`,
+        `"\\\b\f\r\n\t\"\u0030\"\t\n\r\f\b\\abc"`,
+        `"abc\\\b\f\r\n\t\"\u0030\"\t\n\r\f\b\\"`,
+        `"abc\\\b\f\r\n\t\"\u0048\"\t\n\r\f\b\\abc"`,
+        `"\\\\\\\"\"\"\"\\\""`,
+        `"""`,
+    }
 
+    invalidTests := []string {
+        `"`,
+        `"\"`,
+        `"\\\b\z\\xyz"others`,
+        `"xyz\u888xyz"others`,
+        `"xyz\u"others`,
+        `"xyz\uf"others`,
+        `"xyz\uff"others`,
+        `"xyz\ufff"others`,
+        `"xyz\ufffothers`,
+    }
+
+    for _, js := range validTests {
+        token, cursor, err := tokenizeString([]rune(js), 0)
+        t.Log(js, token, err, cursor)
+        // t.Logf("%#v, %#v, %#v, %#v,", js, token, err, cursor)
+    }
+
+    for _, js := range invalidTests {
+        token, cursor, err := tokenizeString([]rune(js), 0)
+        t.Log(js, token, err, cursor)
+    }
 }
