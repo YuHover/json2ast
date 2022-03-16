@@ -25,8 +25,8 @@ func TestTokenizeBoolean(t *testing.T) {
 	}
 
 	for _, js := range jsonStrs {
-		token, cursor, err := tokenizeBoolean([]rune(js), 0)
-		t.Log(token, err, cursor)
+		token, cursor, line, err := tokenizeBoolean([]rune(js), 0, 1)
+		t.Log(token, cursor, err, line)
 	}
 }
 
@@ -53,8 +53,8 @@ func TestTokenizeNull(t *testing.T) {
 	}
 
 	for _, js := range jsonStrs {
-		token, cursor, err := tokenizeNull([]rune(js), 0)
-		t.Log(token, err, cursor)
+		token, cursor, line, err := tokenizeNull([]rune(js), 0,1)
+        t.Log(token, cursor, err, line)
 	}
 }
 
@@ -139,13 +139,13 @@ func TestTokenizeNumber(t *testing.T) {
 	}
 
 	for _, js := range validTests {
-		token, cursor, err := tokenizeNumber([]rune(js), 0)
-		t.Log(js, token, err, cursor)
+		token, cursor, line, err := tokenizeNumber([]rune(js), 0, 1)
+        t.Log(token, cursor, err, line)
 	}
 
 	for _, js := range invalidTests {
-		token, cursor, err := tokenizeNumber([]rune(js), 0)
-		t.Log(js, token, err, cursor)
+		token, cursor, line, err := tokenizeNumber([]rune(js), 0, 1)
+        t.Log(token, cursor, err, line)
 	}
 }
 
@@ -174,13 +174,12 @@ func TestTokenizeString(t *testing.T) {
     }
 
     for _, js := range validTests {
-        token, cursor, err := tokenizeString([]rune(js), 0)
-        t.Log(js, token, err, cursor)
-        // t.Logf("%#v, %#v, %#v, %#v,", js, token, err, cursor)
+        token, cursor, line, err := tokenizeString([]rune(js), 0, 1)
+        t.Log(token, cursor, err, line)
     }
 
     for _, js := range invalidTests {
-        token, cursor, err := tokenizeString([]rune(js), 0)
-        t.Log(js, token, err, cursor)
+        token, cursor, line, err := tokenizeString([]rune(js), 0, 1)
+        t.Log(token, cursor, err, line)
     }
 }

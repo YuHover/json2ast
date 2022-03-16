@@ -1,9 +1,7 @@
 package jsonparser
 
 import (
-	"errors"
-	// "fmt"
-	"unicode"
+    "unicode"
 )
 
 type tokenType uint8
@@ -24,6 +22,7 @@ const (
 type jsonToken struct {
 	typ tokenType
 	val string
+    loc location
 }
 
 type State uint8 // status of DFA
@@ -41,6 +40,7 @@ var delimiters = map[rune]bool {
 func tokenize(source string) []jsonToken {
 	var runeSource = []rune(source)
 	var cursor = 0
+    var lineNum = 1
 	var jts []jsonToken
 
 	var r rune
@@ -69,29 +69,34 @@ func tokenize(source string) []jsonToken {
 			jts = append(jts, jsonToken{ typ: Comma, val: "," })
 			cursor++
 		case r == 't' || r == 'f':
-			token, cursor, err = tokenizeBoolean(runeSource, cursor)
+			token, cursor, lineNum, err = tokenizeBoolean(runeSource, cursor, lineNum)
 			if err != nil {
 				jts = append(jts, token)
 			}
 		case r == 'n':
-			token, cursor, err = tokenizeNull(runeSource, cursor)
+			token, cursor, lineNum, err = tokenizeNull(runeSource, cursor, lineNum)
 			if err != nil {
 				jts = append(jts, token)
 			}
 		case r == '"':
-			token, cursor, err = tokenizeString(runeSource, cursor)
+			token, cursor, lineNum, err = tokenizeString(runeSource, cursor, lineNum)
 			if err != nil {
 				jts = append(jts, token)
 			}
 		case unicode.IsDigit(r) || r == '+' || r == '-':
-			token, cursor, err = tokenizeNumber(runeSource, cursor)
+			token, cursor, lineNum, err = tokenizeNumber(runeSource, cursor, lineNum)
 			if err != nil {
 				jts = append(jts, token)
 			}
-		case whiteSpace[r]: cursor++
+		case whiteSpace[r]:
+            if r == '\n' { lineNum++ }
+            cursor++
 		default:
 			var i = cursor
-			for ; i < len(runeSource) && !delimiters[r]; i++ { r = runeSource[i] }
+			for ; i < len(runeSource) && !delimiters[r]; i++ {
+                r = runeSource[i]
+                if r == '\n' { lineNum++ }
+            }
 			// TODO: build error runeSource[cursor:i]
 			cursor = i
 		}
@@ -100,7 +105,7 @@ func tokenize(source string) []jsonToken {
 	return jts
 }
 
-func tokenizeBoolean(source []rune, start int) (jsonToken, int, error) {
+func tokenizeBoolean(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
 	const (
 		Initial State = iota
 		T
@@ -117,12 +122,13 @@ func tokenizeBoolean(source []rune, start int) (jsonToken, int, error) {
 	var r rune
 	var stage = Initial
 	var cursor = start
+    var line = lineNum
 
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
-		if delimiters[r] {
-			break
-		}
+
+        if r == '\n' { line++ }
+		if delimiters[r] { break }
 
 		switch stage {
 		case Initial:	if r == 't' { stage = T; continue }
@@ -142,19 +148,17 @@ func tokenizeBoolean(source []rune, start int) (jsonToken, int, error) {
 
 	// illegal: tru<stop>	trua<stop>	truea<stop>
 	// legal:	true<stop>	false<stop>
-	var err error
-	if stage != Legal {
-		err = errors.New(string(source[start:cursor])) // TODO: build error
-	}
-	
-	var token = jsonToken {
-		typ: Boolean,
-		val: string(source[start:cursor]),
-	}
-
-	return token, cursor, err
+    var err error
+    var token jsonToken
+    if stage != Legal {
+        err = jsonError{ typ: InvalidToken, loc: location{ lineNum, start } }
+        return token, cursor, line, err
+    }
+    token = makeToken(Boolean, string(source[start:cursor]), lineNum, start)
+	return token, cursor, line, err
 }
-func tokenizeNull(source []rune, start int) (jsonToken, int, error) {
+
+func tokenizeNull(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
 	const (
 		Initial State = iota
 		N
@@ -167,13 +171,13 @@ func tokenizeNull(source []rune, start int) (jsonToken, int, error) {
 	var r rune
 	var stage = Initial
 	var cursor = start
+    var line = lineNum
 
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
 
-		if delimiters[r] {
-			break
-		}
+        if r == '\n' { line++ }
+		if delimiters[r] { break }
 
 		switch stage {
 		case Initial:	if r == 'n' { stage = N } else { stage = Panic }
@@ -188,18 +192,16 @@ func tokenizeNull(source []rune, start int) (jsonToken, int, error) {
 	// illegal: nu<stop>	nulb<stop>	nullb<stop>
 	// legal:	null<stop>
 	var err error
+    var token jsonToken
 	if stage != Legal {
-		err = errors.New(string(source[start:cursor])) // TODO: build error
+		err = jsonError{ typ: InvalidToken, loc: location{ lineNum, start } }
+        return token, cursor, line, err
 	}
-
-	var token = jsonToken {
-		typ: Null,
-		val: string(source[start:cursor]),
-	}
-
-	return token, cursor, err
+    token = makeToken(Null, string(source[start:cursor]), lineNum, start)
+	return token, cursor, line, err
 }
-func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
+
+func tokenizeNumber(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
 	const (
 		Initial		State = iota
 		Neg
@@ -216,12 +218,14 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 	var r rune
 	var stage = Initial
 	var cursor = start
+    var line = lineNum
 
 	for ; cursor < len(source); cursor++ {
 		r = source[cursor]
-		if delimiters[r] {
-			break
-		}
+
+        if r == '\n' { line++ }
+        if delimiters[r] { break}
+
 		switch stage {
 		case Initial:
 			if r == '0' { stage = Zero; continue }
@@ -262,19 +266,17 @@ func tokenizeNumber(source []rune, start int) (jsonToken, int, error) {
 		}
 	}
 
-	var err error
-	if stage != Zero && stage != Integer && stage != Frac && stage != Exp {
-		err = errors.New(string(source[start:cursor])) // TODO: build error
-	}
-
-	var token = jsonToken {
-		typ: Number,
-		val: string(source[start:cursor]),
-	}
-
-	return token, cursor, err
+    var err error
+    var token jsonToken
+    if stage != Zero && stage != Integer && stage != Frac && stage != Exp {
+        err = jsonError{ typ: InvalidToken, loc: location{ lineNum,start } }
+        return token, cursor, line, err
+    }
+    token = makeToken(Number, string(source[start:cursor]), lineNum, start)
+	return token, cursor, line, err
 }
-func tokenizeString(source []rune, start int) (jsonToken, int, error) {
+
+func tokenizeString(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
 	const (
 		Initial 	State = iota
 		Open
@@ -283,27 +285,31 @@ func tokenizeString(source []rune, start int) (jsonToken, int, error) {
 		Hex
 		HexHex
 		HexHexHex
-		Close
+        Acc
 		Panic
 	)
 
 	var r rune
 	var stage = Initial
 	var cursor = start
+    var line = lineNum
+    var isClose = false
+    var before State
 
 	for ; cursor < len(source); cursor++ {
-		r = source[cursor]
+        if stage != Panic { before = stage }
 
+		r = source[cursor]
+        if r == '\n' { line++ }
 		if r == '"' && (stage != Initial && stage != Escape) {
-			if stage == Open {
-				stage = Close
-			}
+            isClose = true
+            if stage == Open { stage = Acc }
 			break
 		}
 
 		switch stage {
-		case Initial: 	if r == '"' { stage = Open } else { stage = Panic }
-		case Unicode: 	if isHex(r) { stage = Hex } else { stage = Panic }
+		case Initial: 	if r == '"' { stage = Open } else { stage =  Panic }
+		case Unicode: 	if isHex(r) { stage = Hex } else { stage =  Panic }
 		case Hex: 		if isHex(r) { stage = HexHex } else { stage = Panic }
 		case HexHex: 	if isHex(r) { stage = HexHexHex } else { stage = Panic }
 		case HexHexHex: if isHex(r) { stage = Open; continue } else { stage = Panic }
@@ -314,7 +320,7 @@ func tokenizeString(source []rune, start int) (jsonToken, int, error) {
 		case Escape:
 			if r == 'u' { stage = Unicode; continue }
 			if isEscapable(r) { stage = Open; continue }
-			stage = Panic
+            stage = Panic
 		case Panic:
 			if r == '\\' { cursor++ } // skip next rune
 			stage = Panic
@@ -326,16 +332,32 @@ func tokenizeString(source []rune, start int) (jsonToken, int, error) {
 	}
 
 	var err error
-	if stage != Close {
-		err = errors.New(string(source[start:cursor])) // TODO: build error
-	}
+    var token jsonToken
+    if stage != Acc {
+        var errTyp errorType
+        if !isClose {
+            errTyp = MissCloseQuote
+        } else if before == Unicode || before == Hex || before == HexHex || before == HexHexHex {
+            errTyp = InvalidUnicode
+        } else if before == Escape {
+            errTyp = InvalidEscape
+        } else if before == Open {
+            errTyp = InvalidChar
+        }
 
-	var token = jsonToken {
-		typ: String,
-		val: string(source[start:cursor]),
+        err = jsonError{ typ: errTyp, loc: location{ lineNum, start } }
+        return token, cursor, line, err
 	}
+    token = makeToken(String, string(source[start:cursor]), lineNum, start)
+	return token, cursor, line, err
+}
 
-	return token, cursor, err
+func makeToken(typ tokenType, value string, lineNum int, pos int) jsonToken {
+    return jsonToken{
+        typ: typ,
+        val: value,
+        loc: location{ lineNum, pos },
+    }
 }
 
 func isHex(r rune) bool {
