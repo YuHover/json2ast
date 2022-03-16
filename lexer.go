@@ -37,11 +37,12 @@ var delimiters = map[rune]bool {
 }
 
 // 将json字符串解析成token流
-func tokenize(source string) []jsonToken {
+func tokenize(source string) ([]jsonToken, []jsonError) {
 	var runeSource = []rune(source)
 	var cursor = 0
     var lineNum = 1
 	var jts []jsonToken
+    var jerrs []jsonError
 
 	var r rune
 	var token jsonToken
@@ -51,58 +52,51 @@ func tokenize(source string) []jsonToken {
 		r = runeSource[cursor]
 		switch {
 		case r == '{':
-			jts = append(jts, jsonToken{ typ: LeftBrace, val: "{" })
+			jts = append(jts, jsonToken{ typ: LeftBrace, val: "{", loc: location{lineNum, cursor } })
 			cursor++
 		case r == '}':
-			jts = append(jts, jsonToken{ typ: RightBrace, val: "}" })
+			jts = append(jts, jsonToken{ typ: RightBrace, val: "}", loc: location{lineNum, cursor } })
 			cursor++
 		case r == '[':
-			jts = append(jts, jsonToken{ typ: LeftBracket, val: "[" })
+			jts = append(jts, jsonToken{ typ: LeftBracket, val: "[", loc: location{lineNum, cursor } })
 			cursor++
 		case r == ']':
-			jts = append(jts, jsonToken{ typ: RightBracket, val: "]" })
+			jts = append(jts, jsonToken{ typ: RightBracket, val: "]", loc: location{lineNum, cursor } })
 			cursor++
 		case r == ':':
-			jts = append(jts, jsonToken{ typ: Colon, val: ":" })
+			jts = append(jts, jsonToken{ typ: Colon, val: ":", loc: location{lineNum, cursor } })
 			cursor++
 		case r == ',':
-			jts = append(jts, jsonToken{ typ: Comma, val: "," })
+			jts = append(jts, jsonToken{ typ: Comma, val: ",", loc: location{lineNum, cursor } })
 			cursor++
 		case r == 't' || r == 'f':
 			token, cursor, lineNum, err = tokenizeBoolean(runeSource, cursor, lineNum)
-			if err != nil {
-				jts = append(jts, token)
-			}
+			if err != nil { jerrs = append(jerrs, err.(jsonError)) }
+            jts = append(jts, token)
 		case r == 'n':
-			token, cursor, lineNum, err = tokenizeNull(runeSource, cursor, lineNum)
-			if err != nil {
-				jts = append(jts, token)
-			}
+            token, cursor, lineNum, err = tokenizeNull(runeSource, cursor, lineNum)
+            if err != nil { jerrs = append(jerrs, err.(jsonError)) }
+            jts = append(jts, token)
 		case r == '"':
-			token, cursor, lineNum, err = tokenizeString(runeSource, cursor, lineNum)
-			if err != nil {
-				jts = append(jts, token)
-			}
+            token, cursor, lineNum, err = tokenizeString(runeSource, cursor, lineNum)
+            if err != nil { jerrs = append(jerrs, err.(jsonError)) }
+            jts = append(jts, token)
 		case unicode.IsDigit(r) || r == '+' || r == '-':
-			token, cursor, lineNum, err = tokenizeNumber(runeSource, cursor, lineNum)
-			if err != nil {
-				jts = append(jts, token)
-			}
+            token, cursor, lineNum, err = tokenizeNumber(runeSource, cursor, lineNum)
+            if err != nil { jerrs = append(jerrs, err.(jsonError)) }
+            jts = append(jts, token)
 		case whiteSpace[r]:
             if r == '\n' { lineNum++ }
             cursor++
 		default:
 			var i = cursor
-			for ; i < len(runeSource) && !delimiters[r]; i++ {
-                r = runeSource[i]
-                if r == '\n' { lineNum++ }
-            }
-			// TODO: build error runeSource[cursor:i]
+			for ; i < len(runeSource) && !delimiters[r]; i++ { r = runeSource[i] }
+			jerrs = append(jerrs, jsonError{ typ: InvalidToken,  loc: location{lineNum, cursor } })
 			cursor = i
 		}
 	}
 
-	return jts
+	return jts, jerrs
 }
 
 func tokenizeBoolean(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
