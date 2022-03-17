@@ -27,8 +27,14 @@ func TestTokenizeBoolean(t *testing.T) {
 	}
 
 	for _, js := range jsonStrs {
-		token, cursor, line, err := tokenizeBoolean([]rune(js), 0, 1)
-		t.Log(token, cursor, err, line)
+        var ctx = context {
+            rs:      []rune(js),
+            cursor:  0,
+            lineNum: 1,
+            colNum:  1,
+        }
+		token, err := tokenizeBoolean(&ctx)
+		t.Log(token, err, ctx)
 	}
 }
 
@@ -55,8 +61,14 @@ func TestTokenizeNull(t *testing.T) {
 	}
 
 	for _, js := range jsonStrs {
-		token, cursor, line, err := tokenizeNull([]rune(js), 0,1)
-        t.Log(token, cursor, err, line)
+        var ctx = context {
+            rs:      []rune(js),
+            cursor:  0,
+            lineNum: 1,
+            colNum:  1,
+        }
+        token, err := tokenizeNull(&ctx)
+        t.Log(token, err, ctx)
 	}
 }
 
@@ -141,13 +153,25 @@ func TestTokenizeNumber(t *testing.T) {
 	}
 
 	for _, js := range validTests {
-		token, cursor, line, err := tokenizeNumber([]rune(js), 0, 1)
-        t.Log(token, cursor, err, line)
+        var ctx = context {
+            rs:      []rune(js),
+            cursor:  0,
+            lineNum: 1,
+            colNum:  1,
+        }
+        token, err := tokenizeNumber(&ctx)
+        t.Log(token, err, ctx)
 	}
 
 	for _, js := range invalidTests {
-		token, cursor, line, err := tokenizeNumber([]rune(js), 0, 1)
-        t.Log(token, cursor, err, line)
+        var ctx = context {
+            rs:      []rune(js),
+            cursor:  0,
+            lineNum: 1,
+            colNum:  1,
+        }
+        token, err := tokenizeBoolean(&ctx)
+        t.Log(token, err, ctx)
 	}
 }
 
@@ -176,13 +200,25 @@ func TestTokenizeString(t *testing.T) {
     }
 
     for _, js := range validTests {
-        token, cursor, line, err := tokenizeString([]rune(js), 0, 1)
-        t.Log(token, cursor, err, line)
+        var ctx = context {
+            rs:      []rune(js),
+            cursor:  0,
+            lineNum: 1,
+            colNum:  1,
+        }
+        token, err := tokenizeString(&ctx)
+        t.Log(token, err, ctx)
     }
 
     for _, js := range invalidTests {
-        token, cursor, line, err := tokenizeString([]rune(js), 0, 1)
-        t.Log(token, cursor, err, line)
+        var ctx = context {
+            rs:      []rune(js),
+            cursor:  0,
+            lineNum: 1,
+            colNum:  1,
+        }
+        token, err := tokenizeString(&ctx)
+        t.Log(token, err, ctx)
     }
 }
 

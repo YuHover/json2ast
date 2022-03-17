@@ -36,11 +36,46 @@ var delimiters = map[rune]bool {
 	'"': true, ',': true, ':': true,
 }
 
+var fm = map[rune]func(*context)(jsonToken, error) {
+    't': tokenizeBoolean,
+    'f': tokenizeBoolean,
+    'n': tokenizeNull,
+    '"': tokenizeString,
+    '+': tokenizeNumber,
+    '-': tokenizeNumber,
+}
+
+var tm = map[rune] tokenType {
+    '{': LeftBrace,
+    '}': RightBrace,
+    '[': LeftBracket,
+    ']': RightBracket,
+    ':': Colon,
+    ',': Comma,
+}
+
+type context struct {
+    rs      []rune
+    cursor  int
+    lineNum int
+    colNum  int
+}
+
+func init() {
+    for r := '0'; r <= '9'; r++ {
+        fm[r] = tokenizeNumber
+    }
+}
+
 // 将json字符串解析成token流
 func tokenize(source string) ([]jsonToken, []jsonError) {
-	var runeSource = []rune(source)
-	var cursor = 0
-    var lineNum = 1
+	var ctx = context {
+        rs:      []rune(source),
+        cursor:  0,
+        lineNum: 1,
+        colNum:  1,
+    }
+
 	var jts []jsonToken
     var jerrs []jsonError
 
@@ -48,58 +83,56 @@ func tokenize(source string) ([]jsonToken, []jsonError) {
 	var token jsonToken
 	var err error
 
-	for cursor < len(runeSource) {
-		r = runeSource[cursor]
+    var doTokenizeSingle = func(r rune) {
+        token = jsonToken{ tm[r], string(r), location{ctx.lineNum, ctx.colNum } }
+        jts = append(jts, token)
+        ctx.cursor++
+        ctx.colNum++
+    }
+    
+    var doTokenizeCall = func(r rune) {
+        token, err = fm[r](&ctx)
+        if err != nil { jerrs = append(jerrs, err.(jsonError)) }
+        jts = append(jts, token)
+    }
+
+	for ctx.cursor < len(ctx.rs) {
+        r = ctx.rs[ctx.cursor]
 		switch {
-		case r == '{':
-			jts = append(jts, jsonToken{ typ: LeftBrace, val: "{", loc: location{lineNum, cursor } })
-			cursor++
-		case r == '}':
-			jts = append(jts, jsonToken{ typ: RightBrace, val: "}", loc: location{lineNum, cursor } })
-			cursor++
-		case r == '[':
-			jts = append(jts, jsonToken{ typ: LeftBracket, val: "[", loc: location{lineNum, cursor } })
-			cursor++
-		case r == ']':
-			jts = append(jts, jsonToken{ typ: RightBracket, val: "]", loc: location{lineNum, cursor } })
-			cursor++
-		case r == ':':
-			jts = append(jts, jsonToken{ typ: Colon, val: ":", loc: location{lineNum, cursor } })
-			cursor++
-		case r == ',':
-			jts = append(jts, jsonToken{ typ: Comma, val: ",", loc: location{lineNum, cursor } })
-			cursor++
-		case r == 't' || r == 'f':
-			token, cursor, lineNum, err = tokenizeBoolean(runeSource, cursor, lineNum)
-			if err != nil { jerrs = append(jerrs, err.(jsonError)) }
-            jts = append(jts, token)
-		case r == 'n':
-            token, cursor, lineNum, err = tokenizeNull(runeSource, cursor, lineNum)
-            if err != nil { jerrs = append(jerrs, err.(jsonError)) }
-            jts = append(jts, token)
-		case r == '"':
-            token, cursor, lineNum, err = tokenizeString(runeSource, cursor, lineNum)
-            if err != nil { jerrs = append(jerrs, err.(jsonError)) }
-            jts = append(jts, token)
-		case unicode.IsDigit(r) || r == '+' || r == '-':
-            token, cursor, lineNum, err = tokenizeNumber(runeSource, cursor, lineNum)
-            if err != nil { jerrs = append(jerrs, err.(jsonError)) }
-            jts = append(jts, token)
-		case whiteSpace[r]:
-            if r == '\n' { lineNum++ }
-            cursor++
+		case r == '{': fallthrough
+		case r == '}': fallthrough
+		case r == '[': fallthrough
+		case r == ']': fallthrough
+		case r == ':': fallthrough
+		case r == ',': doTokenizeSingle(r)
+
+        case r == 't' || r == 'f':  fallthrough
+		case r == 'n':              fallthrough
+		case r == '"':              fallthrough
+		case unicode.IsDigit(r) || r == '+' || r == '-': doTokenizeCall(r)
+
+        case whiteSpace[r]:
+            ctx.cursor++
+            ctx.colNum++
+            if r == '\n' {
+                ctx.lineNum++
+                ctx.colNum = 1
+            }
 		default:
-			var i = cursor
-			for ; i < len(runeSource) && !delimiters[r]; i++ { r = runeSource[i] }
-			jerrs = append(jerrs, jsonError{ typ: InvalidToken,  loc: location{lineNum, cursor } })
-			cursor = i
+			var col = ctx.colNum
+			for ; ctx.cursor < len(ctx.rs) && !delimiters[r]; ctx.cursor++ {
+                r = ctx.rs[ctx.cursor]
+                ctx.colNum++
+            }
+            err = jsonError{InvalidToken, location {ctx.lineNum,col } }
+			jerrs = append(jerrs, err.(jsonError))
 		}
 	}
 
 	return jts, jerrs
 }
 
-func tokenizeBoolean(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
+func tokenizeBoolean(ctx *context) (jsonToken, error) {
 	const (
 		Initial State = iota
 		T
@@ -115,14 +148,13 @@ func tokenizeBoolean(source []rune, start int, lineNum int) (jsonToken, int, int
 
 	var r rune
 	var stage = Initial
-	var cursor = start
-    var line = lineNum
+	var start = ctx.cursor
+    var col = ctx.colNum
 
-	for ; cursor < len(source); cursor++ {
-		r = source[cursor]
-
-        if r == '\n' { line++ }
+	for ; ctx.cursor < len(ctx.rs); ctx.cursor++ {
+		r = ctx.rs[ctx.cursor]
 		if delimiters[r] { break }
+        ctx.colNum++
 
 		switch stage {
 		case Initial:	if r == 't' { stage = T; continue }
@@ -140,19 +172,21 @@ func tokenizeBoolean(source []rune, start int, lineNum int) (jsonToken, int, int
 		}
 	}
 
-	// illegal: tru<stop>	trua<stop>	truea<stop>
-	// legal:	true<stop>	false<stop>
     var err error
     var token jsonToken
     if stage != Legal {
-        err = jsonError{ typ: InvalidToken, loc: location{ lineNum, start } }
-        return token, cursor, line, err
+        err = jsonError{ InvalidToken, location{ ctx.lineNum, col } }
+        return token, err
     }
-    token = makeToken(Boolean, string(source[start:cursor]), lineNum, start)
-	return token, cursor, line, err
+    token = jsonToken {
+        typ: Boolean,
+        val: string(ctx.rs[start:ctx.cursor]),
+        loc: location{ctx.lineNum, col},
+    }
+	return token, err
 }
 
-func tokenizeNull(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
+func tokenizeNull(ctx *context) (jsonToken, error) {
 	const (
 		Initial State = iota
 		N
@@ -164,14 +198,13 @@ func tokenizeNull(source []rune, start int, lineNum int) (jsonToken, int, int, e
 
 	var r rune
 	var stage = Initial
-	var cursor = start
-    var line = lineNum
+	var start = ctx.cursor
+    var col = ctx.colNum
 
-	for ; cursor < len(source); cursor++ {
-		r = source[cursor]
-
-        if r == '\n' { line++ }
+	for ; ctx.cursor < len(ctx.rs); ctx.cursor++ {
+		r = ctx.rs[ctx.cursor]
 		if delimiters[r] { break }
+        ctx.colNum++
 
 		switch stage {
 		case Initial:	if r == 'n' { stage = N } else { stage = Panic }
@@ -183,19 +216,21 @@ func tokenizeNull(source []rune, start int, lineNum int) (jsonToken, int, int, e
 		}
 	}
 
-	// illegal: nu<stop>	nulb<stop>	nullb<stop>
-	// legal:	null<stop>
 	var err error
     var token jsonToken
 	if stage != Legal {
-		err = jsonError{ typ: InvalidToken, loc: location{ lineNum, start } }
-        return token, cursor, line, err
+		err = jsonError{ InvalidToken, location{ ctx.lineNum, col } }
+        return token, err
 	}
-    token = makeToken(Null, string(source[start:cursor]), lineNum, start)
-	return token, cursor, line, err
+    token = jsonToken {
+        typ: Null,
+        val: string(ctx.rs[start:ctx.cursor]),
+        loc: location{ctx.lineNum, col},
+    }
+	return token, err
 }
 
-func tokenizeNumber(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
+func tokenizeNumber(ctx *context) (jsonToken, error) {
 	const (
 		Initial		State = iota
 		Neg
@@ -211,14 +246,13 @@ func tokenizeNumber(source []rune, start int, lineNum int) (jsonToken, int, int,
 
 	var r rune
 	var stage = Initial
-	var cursor = start
-    var line = lineNum
+	var start = ctx.cursor
+    var col = ctx.colNum
 
-	for ; cursor < len(source); cursor++ {
-		r = source[cursor]
-
-        if r == '\n' { line++ }
-        if delimiters[r] { break}
+	for ; ctx.cursor < len(ctx.rs); ctx.cursor++ {
+		r = ctx.rs[ctx.cursor]
+        if delimiters[r] { break }
+        ctx.colNum++
 
 		switch stage {
 		case Initial:
@@ -263,14 +297,18 @@ func tokenizeNumber(source []rune, start int, lineNum int) (jsonToken, int, int,
     var err error
     var token jsonToken
     if stage != Zero && stage != Integer && stage != Frac && stage != Exp {
-        err = jsonError{ typ: InvalidToken, loc: location{ lineNum,start } }
-        return token, cursor, line, err
+        err = jsonError{ InvalidToken, location{ ctx.lineNum,col } }
+        return token, err
     }
-    token = makeToken(Number, string(source[start:cursor]), lineNum, start)
-	return token, cursor, line, err
+    token = jsonToken {
+        typ: Number,
+        val: string(ctx.rs[start:ctx.cursor]),
+        loc: location{ctx.lineNum, col},
+    }
+	return token, err
 }
 
-func tokenizeString(source []rune, start int, lineNum int) (jsonToken, int, int, error) {
+func tokenizeString(ctx *context) (jsonToken, error) {
 	const (
 		Initial 	State = iota
 		Open
@@ -285,19 +323,27 @@ func tokenizeString(source []rune, start int, lineNum int) (jsonToken, int, int,
 
 	var r rune
 	var stage = Initial
-	var cursor = start
-    var line = lineNum
+    var start = ctx.cursor
+    var line = ctx.lineNum
+    var col = ctx.colNum
     var isClose = false
     var before State
 
-	for ; cursor < len(source); cursor++ {
+	for ; ctx.cursor < len(ctx.rs); ctx.cursor++ {
         if stage != Panic { before = stage }
 
-		r = source[cursor]
-        if r == '\n' { line++ }
+        ctx.colNum++
+        r = ctx.rs[ctx.cursor]
+
+        if r == '\n' {
+            ctx.lineNum++
+            ctx.colNum = 1
+        }
+
 		if r == '"' && (stage != Initial && stage != Escape) {
             isClose = true
             if stage == Open { stage = Acc }
+            ctx.cursor++
 			break
 		}
 
@@ -306,7 +352,7 @@ func tokenizeString(source []rune, start int, lineNum int) (jsonToken, int, int,
 		case Unicode: 	if isHex(r) { stage = Hex } else { stage =  Panic }
 		case Hex: 		if isHex(r) { stage = HexHex } else { stage = Panic }
 		case HexHex: 	if isHex(r) { stage = HexHexHex } else { stage = Panic }
-		case HexHexHex: if isHex(r) { stage = Open; continue } else { stage = Panic }
+		case HexHexHex: if isHex(r) { stage = Open } else { stage = Panic }
 		case Open:
 			if r == '\\' { stage = Escape; continue }
 			if r >= 0x0020 && r <= 0x10FFF && !unicode.IsControl(r) { stage = Open; continue }
@@ -316,13 +362,9 @@ func tokenizeString(source []rune, start int, lineNum int) (jsonToken, int, int,
 			if isEscapable(r) { stage = Open; continue }
             stage = Panic
 		case Panic:
-			if r == '\\' { cursor++ } // skip next rune
+			if r == '\\' { ctx.cursor++ } // skip next rune
 			stage = Panic
 		}
-	}
-
-	if cursor++; cursor >= len(source) {
-		cursor = len(source)
 	}
 
 	var err error
@@ -339,19 +381,15 @@ func tokenizeString(source []rune, start int, lineNum int) (jsonToken, int, int,
             errTyp = InvalidChar
         }
 
-        err = jsonError{ typ: errTyp, loc: location{ lineNum, start } }
-        return token, cursor, line, err
+        err = jsonError{ errTyp, location{ line, col } }
+        return token, err
 	}
-    token = makeToken(String, string(source[start:cursor]), lineNum, start)
-	return token, cursor, line, err
-}
-
-func makeToken(typ tokenType, value string, lineNum int, pos int) jsonToken {
-    return jsonToken{
-        typ: typ,
-        val: value,
-        loc: location{ lineNum, pos },
+    token = jsonToken {
+        typ: String,
+        val: string(ctx.rs[start:ctx.cursor]),
+        loc: location{line, col},
     }
+	return token, err
 }
 
 func isHex(r rune) bool {
