@@ -370,7 +370,7 @@ func tokenizeString(ctx *context) (jsonToken, error) {
 	var err error
     var token jsonToken
     if stage != Acc {
-        var errTyp errorType
+        var errTyp ErrorType
         if !isClose {
             errTyp = MissCloseQuote
         } else if before == Unicode || before == Hex || before == HexHex || before == HexHexHex {

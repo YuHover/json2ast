@@ -2,10 +2,10 @@ package jsonparser
 
 import "fmt"
 
-type errorType uint8
+type ErrorType uint8
 
 const (
-    InvalidEscape   errorType = iota
+    InvalidEscape ErrorType = iota
     InvalidChar
     InvalidUnicode
     InvalidToken
@@ -18,7 +18,7 @@ type location struct {
 }
 
 type jsonError struct {
-    typ errorType
+    typ ErrorType
     loc location
 }
 
