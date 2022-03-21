@@ -20,9 +20,9 @@ const (
 )
 
 type jsonToken struct {
-	typ tokenType
-	val string
-    loc location
+	Typ tokenType
+	Val string
+    Loc location
 }
 
 type State uint8 // status of DFA
@@ -179,9 +179,9 @@ func tokenizeBoolean(ctx *context) (jsonToken, error) {
         return token, err
     }
     token = jsonToken {
-        typ: Boolean,
-        val: string(ctx.rs[start:ctx.cursor]),
-        loc: location{ctx.lineNum, col},
+        Typ: Boolean,
+        Val: string(ctx.rs[start:ctx.cursor]),
+        Loc: location{ctx.lineNum, col},
     }
 	return token, err
 }
@@ -223,9 +223,9 @@ func tokenizeNull(ctx *context) (jsonToken, error) {
         return token, err
 	}
     token = jsonToken {
-        typ: Null,
-        val: string(ctx.rs[start:ctx.cursor]),
-        loc: location{ctx.lineNum, col},
+        Typ: Null,
+        Val: string(ctx.rs[start:ctx.cursor]),
+        Loc: location{ctx.lineNum, col},
     }
 	return token, err
 }
@@ -301,9 +301,9 @@ func tokenizeNumber(ctx *context) (jsonToken, error) {
         return token, err
     }
     token = jsonToken {
-        typ: Number,
-        val: string(ctx.rs[start:ctx.cursor]),
-        loc: location{ctx.lineNum, col},
+        Typ: Number,
+        Val: string(ctx.rs[start:ctx.cursor]),
+        Loc: location{ctx.lineNum, col},
     }
 	return token, err
 }
@@ -385,9 +385,9 @@ func tokenizeString(ctx *context) (jsonToken, error) {
         return token, err
 	}
     token = jsonToken {
-        typ: String,
-        val: string(ctx.rs[start:ctx.cursor]),
-        loc: location{line, col},
+        Typ: String,
+        Val: string(ctx.rs[start:ctx.cursor]),
+        Loc: location{line, col},
     }
 	return token, err
 }
