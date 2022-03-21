@@ -10,6 +10,8 @@ const (
     InvalidUnicode
     InvalidToken
     MissCloseQuote
+    MissFracPart
+    MissExponentPart
 )
 
 type location struct {
