@@ -170,7 +170,7 @@ func TestTokenizeNumber(t *testing.T) {
             lineNum: 1,
             colNum:  1,
         }
-        token, err := tokenizeBoolean(&ctx)
+        token, err := tokenizeNumber(&ctx)
         t.Log(token, err, ctx)
 	}
 }

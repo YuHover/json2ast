@@ -49,6 +49,6 @@ func travel(ast JsonAst) {
         }
         fmt.Printf("], ")
     case Literal:
-        fmt.Printf("%s, ", ast.LiteralAst.Typ)
+        fmt.Printf("%s, ", ast.LiteralAst.Val)
     }
 }
