@@ -178,6 +178,7 @@ func parseArray() []JsonAst {
 
     if  token.Typ == LeftBrace || token.Typ == LeftBracket || token.Typ == String ||
         token.Typ == Number || token.Typ == Boolean || token.Typ == Null {
+        cursor--
         arrayAst = append(arrayAst, parseElement())
         arrayAst = append(arrayAst, parseAryElements()...)
 
