@@ -1,4 +1,4 @@
-package jsonparser
+package json2ast
 
 import "fmt"
 
