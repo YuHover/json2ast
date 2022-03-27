@@ -12,7 +12,37 @@ const (
     MissCloseQuote
     MissFracPart
     MissExponentPart
+
+    ValueExpected
+    TrailingComma
+    CommaExpected
+    PropertyOrClosingBraceExpected
+    PropertyExpected
+    ColonExpected
+    CommaOrClosingBraceExpected
+    CommaOrClosingBracketExpected
+    EndOfJsonExpected
 )
+
+var descriptions = map[ErrorType]string {
+    InvalidEscape: "InvalidEscape",
+    InvalidChar: "InvalidChar",
+    InvalidUnicode: "InvalidUnicode",
+    InvalidToken: "InvalidToken",
+    MissCloseQuote: "MissCloseQuote",
+    MissFracPart: "MissFracPart",
+    MissExponentPart: "MissExponentPart",
+
+    ValueExpected: "ValueExpected",
+    TrailingComma: "TrailingComma",
+    CommaExpected: "CommaExpected",
+    PropertyOrClosingBraceExpected: "PropertyOrClosingBraceExpected",
+    PropertyExpected: "PropertyExpected",
+    ColonExpected: "ColonExpected",
+    CommaOrClosingBraceExpected: "CommaOrClosingBraceExpected",
+    CommaOrClosingBracketExpected: "CommaOrClosingBracketExpected",
+    EndOfJsonExpected: "EndOfJsonExpected",
+}
 
 type location struct {
     lineNum  int
@@ -25,5 +55,5 @@ type jsonError struct {
 }
 
 func (jerr jsonError) Error() string {
-    return fmt.Sprintf("[%d, %d], type: %v", jerr.loc.lineNum, jerr.loc.position, jerr.typ)
+    return fmt.Sprintf("[%d, %d], type: %s", jerr.loc.lineNum, jerr.loc.position, descriptions[jerr.typ])
 }
