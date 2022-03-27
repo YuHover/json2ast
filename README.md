@@ -1,4 +1,9 @@
 ### json2ast
+
+go语言实现的json parser，将json文本转换为抽象语法树（Abstract Syntax Tree, AST）
+
+
+
 #### 文法：
 
 `ELEMENT -> OBJECT | ARRAY | string | number | true | false | null`
@@ -53,35 +58,6 @@
 
 `E -> {O | [A | string | number | true | false | null`
 
-`O-> } | MS}`
-
-`MS -> string:EMS'`
-
-`MS' -> ɛ | ,MS`
-
-`A -> ] | ES]`
-
-`ES -> EES'`
-
-`ES'-> ɛ | ,ES`
-
-#### 预测分析表：
-
-|     |    {     |  }  |    [     |  ]  |  ,  |     string      |   num    |   true   |  false   |   null   |  :  |  $  |
-|-----|:--------:|:---:|:--------:|:---:|:---:|:---------------:|:--------:|:--------:|:--------:|:--------:|:---:|:---:|
-| E   |    {O    |     |    [A    |     |     |     string      |   num    |   true   |  false   |   null   |     |     |
-| O   |          |  }  |          |     |     |       MS}       |          |          |          |          |     |     |
-| MS  |          |     |          |     |     | string:E**MS'** |          |          |          |          |     |     |
-| MS' |          |  ɛ  |          |     | ,MS |                 |          |          |          |          |     |     |
-| A   |   ES]    |     |   ES]    |  ]  |     |       ES]       |   ES]    |   ES]    |   ES]    |   ES]    |     |     |
-| ES  | E**ES'** |     | E**ES'** |     |     |    E**ES'**     | E**ES'** | E**ES'** | E**ES'** | E**ES'** |     |     |
-| ES' |          |     |          |  ɛ  | ,ES |                 |          |          |          |          |     |     |
-
-
-化简：
-
-`E -> {O | [A | string | number | true | false | null`
-
 `O-> } | string:EMS}`
 
 `MS -> ɛ | ,string:EMS`
@@ -92,10 +68,11 @@
 
 #### 预测分析表：
 
-|     |    {     |  }  |    [     |  ]  |        ,        |     string      |   num    |   true   |  false   |   null   |  :  |  $  |
-|-----|:--------:|:---:|:--------:|:---:|:---------------:|:---------------:|:--------:|:--------:|:--------:|:--------:|:---:|:---:|
-| E   |    {O    |     |    [A    |     |                 |     string      |   num    |   true   |  false   |   null   |     |     |
-| O   |          |  }  |          |     |                 | string:E**MS**} |          |          |          |          |     |     |
-| MS  |          |  ɛ  |          |     | ,string:E**MS** |                 |          |          |          |          |     |     |
-| A   | E**ES**] |     | E**ES**] |  ]  |                 |    E**ES**]     | E**ES**] | E**ES**] | E**ES**] | E**ES**] |     |     |
-| ES  |          |     |          |  ɛ  |    ,E**ES**     |                 |          |          |          |          |     |     |
+|      |    {     |  }   |    [     |  ]   |        ,        |     string      |   num    |   true   |  false   |   null   |  :   |
+| ---- | :------: | :--: | :------: | :--: | :-------------: | :-------------: | :------: | :------: | :------: | :------: | :--: |
+| E    |    {O    |      |    [A    |      |                 |     string      |   num    |   true   |  false   |   null   |      |
+| O    |          |  }   |          |      |                 | string:E**MS**} |          |          |          |          |      |
+| MS   |          |  ɛ   |          |      | ,string:E**MS** |                 |          |          |          |          |      |
+| A    | E**ES**] |      | E**ES**] |  ]   |                 |    E**ES**]     | E**ES**] | E**ES**] | E**ES**] | E**ES**] |      |
+| ES   |          |      |          |  ɛ   |    ,E**ES**     |                 |          |          |          |          |      |
+
