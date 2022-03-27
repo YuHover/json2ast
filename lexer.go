@@ -101,7 +101,7 @@ func tokenize(source string) ([]jsonToken, []jsonError) {
     var jerrs []jsonError
 
     var doTokenizeSingle = func(r rune) {
-        token := jsonToken{ tm[r], string(r), location{ctx.lineNum, ctx.colNum } }
+        token := jsonToken{ tm[r], string(r), location{ctx.lineNum, ctx.colNum - 1 } }
         jts = append(jts, token)
     }
 
